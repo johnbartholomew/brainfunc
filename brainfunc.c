@@ -68,6 +68,7 @@
 #include <assert.h>
 
 #define STATE_SIZE (1<<20) /* 1 MB */
+#define RECURSION_LIMIT 256
 #define MIN_CBUF_CAPACITY 128
 #define MIN_IDTABLE_CAPACITY 8
 #define MAX_SOURCE_SIZE (1<<20) /* 1 MB */
@@ -501,9 +502,13 @@ void swallow_fprintf(FILE *fl, const char *fmt, ...) {
 }
 #endif
 
-int run(struct cmdbuf *cbuf, struct state *state, size_t from, size_t to) {
+int run(struct cmdbuf *cbuf, struct state *state, size_t from, size_t to, int recursion) {
 	size_t i, pos = state->pos;
 	int *cells = state->cells;
+	if (recursion > RECURSION_LIMIT) {
+		fprintf(stderr, "recursion limit reached\n");
+		return -1;
+	}
 	for (i = from; (i < cbuf->len) && (i != to); ++i) {
 		int cmd = cbuf->commands[i].cmd;
 		int cmdarg = cbuf->commands[i].value;
@@ -566,7 +571,7 @@ int run(struct cmdbuf *cbuf, struct state *state, size_t from, size_t to) {
 				exec_fprintf(stdout, "exec repnz %d\n", cmdarg);
 				if (cells[pos]) {
 					state->pos = pos;
-					if (run(cbuf, state, i+1, i+1+cmdarg) < 0) {
+					if (run(cbuf, state, i+1, i+1+cmdarg, recursion+1) < 0) {
 						return -1;
 					}
 					pos = state->pos;
@@ -580,7 +585,7 @@ int run(struct cmdbuf *cbuf, struct state *state, size_t from, size_t to) {
 			case CMD_CALL:
 				exec_fprintf(stdout, "exec call %d\n", cmdarg);
 				state->pos = pos;
-				if (run(cbuf, state, (size_t)cmdarg, (size_t)(-1)) < 0) {
+				if (run(cbuf, state, (size_t)cmdarg, (size_t)(-1), recursion+1) < 0) {
 					return -1;
 				}
 				pos = state->pos;
@@ -620,7 +625,7 @@ int runsource(const char *buf, size_t len) {
 	state.len = STATE_SIZE;
 	state.cells = calloc(STATE_SIZE, sizeof(state.cells[0]));
 	state.pos = state.len / 2;
-	ret = run(&cbuf, &state, 0, (size_t)(-1));
+	ret = run(&cbuf, &state, 0, (size_t)(-1), 0);
 	free(state.cells);
 	return ret;
 }
