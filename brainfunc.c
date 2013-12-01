@@ -431,6 +431,7 @@ const char *compileblock(const char * const buf, const char * const end, struct 
 							cmdbuf_clear(&loopbuf);
 							return 0;
 						}
+						cmdbuf_clear(&loopbuf);
 					}
 					break;
 				case ']':
@@ -626,6 +627,7 @@ int runsource(const char *buf, size_t len) {
 	state.cells = calloc(STATE_SIZE, sizeof(state.cells[0]));
 	state.pos = state.len / 2;
 	ret = run(&cbuf, &state, 0, (size_t)(-1), 0);
+	cmdbuf_clear(&cbuf);
 	free(state.cells);
 	return ret;
 }
@@ -648,6 +650,7 @@ int runfile(const char *path) {
 	if (readfile(path, &buf, &len, 0) < 0)
 		return -1;
 	ret = runsource(buf, len);
+	free(buf);
 	return ret;
 }
 
